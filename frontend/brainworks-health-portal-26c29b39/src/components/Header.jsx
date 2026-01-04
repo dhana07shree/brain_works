@@ -84,7 +84,7 @@ function Header({
          
          <span className='phone'>
             <PhoneIcon className="phone-icon" />
-            <span className="phone-number">+0 123 456 7890</span>
+            <span className="phone-number">+91 123 456 7890</span>
          </span>
          
         <SearchIcon className="search-icon" style={{ cursor: 'pointer' }} />
