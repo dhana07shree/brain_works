@@ -35,6 +35,7 @@ async def predict_endpoint(
     firstName: str = Form(...),
     lastName: str = Form(...),
     age: str = Form(...),
+    gender: str = Form(...),
     phone: str = Form(...),
     email: str = Form(...),
     symptoms: str = Form(...) 
@@ -54,6 +55,7 @@ async def predict_endpoint(
         patient_data = {
             "name": f"{firstName} {lastName}",
             "age": age,
+            "gender": gender,
             "phone": phone,
             "email": email,
             "symptoms": symptoms,

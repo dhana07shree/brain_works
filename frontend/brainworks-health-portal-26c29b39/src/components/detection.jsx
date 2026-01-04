@@ -264,6 +264,7 @@ function BrainWorksApp({ user }) {
     backendData.append("firstName", firstName);
     backendData.append("lastName", lastName);
     backendData.append("age", formData.age || "N/A");
+    backendData.append("gender", formData.gender || "N/A");
     backendData.append("phone", formData.phone || "N/A");
     backendData.append("email", formData.email || "N/A");
     backendData.append("symptoms", formData.symptoms.trim() || "No specific symptoms reported."); 
