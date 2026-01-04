@@ -9,6 +9,10 @@ import tensorflow as tf
 from datetime import datetime
 from google import genai 
 import gdown 
+from dotenv import load_dotenv 
+
+# 🟢 LOAD SECRETS (Critical for Project ID)
+load_dotenv() 
 
 # --- PDF GENERATION LIBRARIES ---
 from reportlab.lib.pagesizes import LETTER
@@ -19,10 +23,15 @@ from reportlab.platypus import Paragraph, Frame
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_JUSTIFY
 
-# --- 1. SETUP VERTEX AI ---
-PROJECT_ID = "project-e40e528f-75be-46e0-bcb"
+# --- 1. SETUP VERTEX AI (SECURE) ---
+PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
 LOCATION = "us-central1"
-os.environ["GOOGLE_CLOUD_PROJECT"] = PROJECT_ID
+
+# Safety Check
+if not PROJECT_ID:
+    print("❌ ERROR: GOOGLE_CLOUD_PROJECT missing from .env file.")
+else:
+    os.environ["GOOGLE_CLOUD_PROJECT"] = PROJECT_ID
 
 try:
     client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
@@ -104,33 +113,32 @@ def final_fix_predict_v4(img_path, model):
         print(f"Pred Error: {e}")
         return None, None, "ERROR", 0, None
 
-# --- 4. PROFESSIONAL DOCTOR AI (Long & Authoritative) ---
+# --- 4. PROFESSIONAL DOCTOR AI ---
 def generate_gemini_report(tumor_type, confidence, patient_data):
     try:
-        print("🔵 Generating Comprehensive AI Report...")
+        print("🔵 Generating Professional AI Report...")
         
+        # 🟢 OPTIMIZED PROMPT: Professional but Concise (150 words max)
         prompt = f"""
-        Act as a Chief of Neuroradiology. Dictate a comprehensive, formal, and authoritative MRI Brain consultation report.
+        Act as a Chief of Neuroradiology. Dictate a formal MRI Brain report.
 
-        **PATIENT CONTEXT:**
-        - Patient Name: {patient_data.get('name')}
-        - Age/Gender: {patient_data.get('age')} years / {patient_data.get('gender')}
-        - Presenting Symptoms: {patient_data.get('symptoms')}
-        - Finding: {tumor_type} with {confidence} confidence.
+        **PATIENT:** {patient_data.get('name')} ({patient_data.get('age')}y / {patient_data.get('gender')})
+        **SYMPTOMS:** {patient_data.get('symptoms')}
+        **FINDING:** {tumor_type} (Confidence: {confidence})
 
-        **REPORTING STANDARDS:**
-        1. **Tone:** Highly professional, clinical, authoritative.
-        2. **Detail:** Provide an extensive description. Do not be brief.
-        3. **Formatting:** Use Markdown bolding (**text**) ONLY for section headers.
+        **RULES:**
+        1. **Tone:** Authoritative, clinical, senior specialist.
+        2. **Length:** STRICTLY under 150 words. (Crucial for page fitting).
+        3. **Format:** Use Markdown bolding (**text**) ONLY for section headers.
 
         **REQUIRED SECTIONS:**
-        **CLINICAL INDICATION:** [Expand upon symptoms]
-        **COMPARISON:** [No prior studies available.]
-        **DETAILED FINDINGS:** [Write 2-3 detailed paragraphs. Describe the lesion or normal parenchyma in deep radiological detail. Mention signal intensity, mass effect, and edema if applicable.]
-        **IMPRESSION:** [Definitive diagnostic statement.]
-        **RECOMMENDATIONS:** [Clear next steps: Neurosurgery consult, etc.]
+        **CLINICAL INDICATION:** [Brief clinical summary]
+        **FINDINGS:** [Concise but technical description of the {tumor_type} or normal brain. Mention key radiological features like signal intensity and mass effect.]
+        **IMPRESSION:** [Definitive diagnosis.]
+        **RECOMMENDATION:** [Specific next steps.]
         """
         
+        # 🟢 USING YOUR REQUESTED MODEL
         response = client.models.generate_content(
             model="gemini-2.5-pro",
             contents=prompt,
@@ -147,28 +155,29 @@ def generate_gemini_report(tumor_type, confidence, patient_data):
         if not response.text:
             raise ValueError("Empty response")
             
-        print("✅ Report Generated")
+        print(f"✅ Report Generated ({len(response.text)} chars)")
         return response.text
 
     except Exception as e:
         print(f"❌ GEMINI ERROR: {e}") 
+        # Fallback to ensure PDF never breaks
         return f"""
         **CLINICAL INDICATION:**
         Patient presented with {patient_data.get('symptoms', 'neurological symptoms')}.
         
         **FINDINGS:**
-        Analysis indicates features consistent with {tumor_type} ({confidence}).
-        Detailed characterization requires direct review.
+        Automated analysis identifies imaging features consistent with {tumor_type} ({confidence}).
+        Primary signals indicate specific regional abnormalities requiring detailed radiological review.
         
         **IMPRESSION:**
         Radiological evidence suggesting {tumor_type}.
         
         **RECOMMENDATION:**
-        Immediate clinical correlation recommended.
+        Immediate clinical correlation and neurosurgical consultation recommended.
         *(Note: AI Report unavailable, using fallback)*
         """
 
-# --- 5. PDF GENERATOR (Auto-Scaling Layout) ---
+# --- 5. PDF GENERATOR (SMART FONT SCALING) ---
 def create_pdf_in_memory(gemini_text, patient_data, img_orig, img_heat, img_cont, tumor_type, confidence):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=LETTER)
@@ -195,8 +204,8 @@ def create_pdf_in_memory(gemini_text, patient_data, img_orig, img_heat, img_cont
     c.drawString(40, box_top - 20, f"Patient: {patient_data.get('name', 'N/A')}")
     c.drawString(40, box_top - 40, f"Age / Gender: {patient_data.get('age', 'N/A')} / {patient_data.get('gender', 'N/A').capitalize()}")
     c.drawString(40, box_top - 60, f"ID: BW-{datetime.now().strftime('%m%d%H')}")
-    c.drawString(300, box_top - 20, f"Date: {patient_data.get('date', datetime.now().strftime('%Y-%m-%d'))}")
-    c.drawString(300, box_top - 40, "Ref: Dr. NeuroScan AI (Chief of Neuroradiology)")
+    c.drawString(300, box_top - 20, f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    c.drawString(300, box_top - 40, "Ref: MRI Brain Scan Analysis")
     c.drawString(300, box_top - 60, "Modality: MRI Brain (Multi-planar)")
 
     # --- SUMMARY ---
@@ -206,7 +215,7 @@ def create_pdf_in_memory(gemini_text, patient_data, img_orig, img_heat, img_cont
     c.drawString(30, summary_y, f"DIAGNOSTIC SUMMARY: {tumor_type.upper()}")
     c.setFillColor(colors.black)
     c.setFont("Helvetica", 10)
-    c.drawString(300, summary_y, f"AI Model Confidence: {confidence}")
+    c.drawRightString(width - 30, summary_y, f"AI Model Confidence: {confidence}")
 
     # --- IMAGES (TOP) ---
     img_y_pos = summary_y - 150 
@@ -235,19 +244,21 @@ def create_pdf_in_memory(gemini_text, patient_data, img_orig, img_heat, img_cont
 
     style_sheet = getSampleStyleSheet()
     
-    # 🟢 AUTO-SCALE FONT SIZE (Prevents disappearing text)
-    # If the report is massive, shrink the font to fit.
+    # 🟢 5. SMART FONT SCALER
     text_len = len(gemini_text)
+    
+    # Defaults
     font_size = 10
     leading = 14
     
+    # If text is huge, shrink the font so it fits
     if text_len > 1800:
         font_size = 7
         leading = 9
-    elif text_len > 1400:
+    elif text_len > 1500:
         font_size = 8
         leading = 10
-    elif text_len > 1000:
+    elif text_len > 1200:
         font_size = 9
         leading = 12
 
@@ -260,6 +271,7 @@ def create_pdf_in_memory(gemini_text, patient_data, img_orig, img_heat, img_cont
         spaceAfter=10
     )
     
+    # Formatting
     safe_text = html.escape(gemini_text)
     formatted_text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', safe_text)
     formatted_text = formatted_text.replace("\n", "<br/>")
@@ -291,7 +303,7 @@ def predict_tumor(image_path, patient_data):
 
         display_result = "No Tumor Detected" if label == 'notumor' else "Tumor Detected"
         if label == 'notumor':
-            tumor_type = "No Intracranial Abnormality Detected"
+            tumor_type = "No Tumor Detected"
         else:
             tumor_type = label.capitalize()
             
